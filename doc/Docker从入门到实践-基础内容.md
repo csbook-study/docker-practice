@@ -9,7 +9,6 @@
 ![Docker 架构](https://docs.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/media/docker-on-linux.png)
 
 > `runc` 是一个 Linux 命令行工具，用于根据 [OCI容器运行时规范](https://github.com/opencontainers/runtime-spec)创建和运行容器。
-
 > `containerd` 是一个守护程序，它管理容器生命周期，提供了在一个节点上执行容器和管理镜像的最小功能集。
 
 **Docker** 在容器的基础上，进行了进一步的封装，从文件系统、网络互联到进程隔离等等，极大的简化了容器的创建和维护。使得 `Docker` 技术比虚拟机技术更为轻便、快捷。
@@ -117,7 +116,7 @@ Docker Registry 公开服务是开放给用户使用、允许用户管理镜像�
 
 由于某些原因，在国内访问这些服务可能会比较慢。国内的一些云服务商提供了针对 Docker Hub 的镜像服务（`Registry Mirror`），这些镜像服务被称为 **加速器**。常见的有 [阿里云加速器](https://www.aliyun.com/product/acr?source=5176.11533457&userCode=8lx5zmtu)、[DaoCloud 加速器](https://www.daocloud.io/mirror#accelerator-doc)等。使用加速器会直接从国内的地址下载 Docker Hub 的镜像，比直接从 Docker Hub 下载速度会提高很多。
 
-国内也有一些云服务商提供类似于 Docker Hub 的公开服务。比如 [网易云镜像服务](https://c.163.com/hub#/m/library/)、[DaoCloud 镜像市场](https://hub.daocloud.io/)、[阿里云镜像库 ](https://www.aliyun.com/product/acr?source=5176.11533457&userCode=8lx5zmtu) 等。
+国内也有一些云服务商提供类似于 Docker Hub 的公开服务。比如 [网易云镜像服务](https://c.163.com/hub#/m/library/)、[DaoCloud 镜像市场](https://hub.daocloud.io/)、[阿里云镜像库](https://www.aliyun.com/product/acr?source=5176.11533457&userCode=8lx5zmtu) 等。
 
 #### 私有 Docker Registry
 
@@ -127,7 +126,57 @@ Docker Registry 公开服务是开放给用户使用、允许用户管理镜像�
 
 除了官方的 Docker Registry 外，还有第三方软件实现了 Docker Registry API，甚至提供了用户界面以及一些高级功能。比如，[Harbor](https://github.com/goharbor/harbor)和 **Sonatype Nexus**。
 
-## 第三章 使用 Docker 镜像
+## 第三章 安装 Docker
+
+### CentOS 安装 Docker
+
+#### 系统要求
+
+Docker 支持 64 位版本 CentOS 7/8，并且要求内核版本不低于 3.10。 CentOS 7 满足最低内核的要求，但由于内核版本比较低，部分功能（如 `overlay2` 存储层驱动）无法使用，并且部分功能可能不太稳定。
+
+#### 卸载旧版本
+
+旧版本的 Docker 称为 `docker` 或者 `docker-engine`，使用以下命令卸载旧版本：
+
+```bash
+$ sudo yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-selinux \
+                  docker-engine-selinux \
+                  docker-engine
+```
+
+#### 安装 Docker
+
+更新 `yum` 软件源缓存，并安装 `docker-ce`。
+
+```bash
+$ sudo yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+```
+
+#### 启动 Docker
+
+```bash
+$ sudo systemctl enable docker
+$ sudo systemctl start docker
+```
+
+#### 测试 Docker 是否安装正确
+
+```bash
+$ docker run --rm hello-world
+```
+
+### 镜像加速器
+
+国内从 Docker Hub 拉取镜像有时会遇到困难，此时可以配置镜像加速器。国内很多云服务商都提供了国内加速器服务。
+
+## 第四章 使用镜像
 
 Docker 运行容器前需要本地存在对应的镜像，如果本地不存在该镜像，Docker 会从镜像仓库下载该镜像。
 
@@ -509,31 +558,9 @@ $ cat Dockerfile | docker build -
 $ docker build - < context.tar.gz
 ```
 
-### 其它制作镜像的方式
+### Dockerfile 指令详解
 
-#### 从 rootfs 压缩包导入
-
-格式：`docker import [选项] <文件>|<URL>|- [<仓库名>[:<标签>]]`
-
-压缩包可以是本地文件、远程 Web 文件，甚至是从标准输入中得到。压缩包将会在镜像 `/` 目录展开，并直接作为镜像第一层提交。
-
-#### Docker 镜像的导入和导出 docker save 和 docker load
-
-Docker 还提供了 `docker save` 和 `docker load` 命令，用以将镜像保存为一个文件，然后传输到另一个位置上，再加载进来。这是在没有 Docker Registry 时的做法，现在已经不推荐，镜像迁移应该直接使用 Docker Registry，无论是直接使用 Docker Hub 还是使用内网私有 Registry 都可以。
-
-### 镜像的实现原理
-
-Docker 镜像是怎么实现增量的修改和维护的？
-
-每个镜像都由很多层次构成，Docker 使用 [Union FS](https://en.wikipedia.org/wiki/UnionFS) 将这些不同的层结合到一个镜像中去。
-
-通常 Union FS 有两个用途, 一方面可以实现不借助 LVM、RAID 将多个 disk 挂到同一个目录下,另一个更常用的就是将一个只读的分支和一个可写的分支联合在一起，Live CD 正是基于此方法可以允许在镜像不变的基础上允许用户在其上进行一些写操作。
-
-Docker 在 OverlayFS 上构建的容器也是利用了类似的原理。
-
-## 第四章 Dockerfile 指令详解
-
-### COPY 复制文件
+#### COPY 复制文件
 
 格式：
 
@@ -544,7 +571,7 @@ Docker 在 OverlayFS 上构建的容器也是利用了类似的原理。
 
 `COPY` 指令将从构建上下文目录中 `<源路径>` 的文件/目录复制到新的一层的镜像内的 `<目标路径>` 位置。
 
-`<源路径>` 可以是多个，甚至可以是通配符，其通配符规则要满足 Go 的 [`filepath.Match`](https://golang.org/pkg/path/filepath/#Match)[ (opens new window)](https://golang.org/pkg/path/filepath/#Match) 规则。
+`<源路径>` 可以是多个，甚至可以是通配符，其通配符规则要满足 Go 的 [`filepath.Match`](https://golang.org/pkg/path/filepath/#Match) 规则。
 
 `<目标路径>` 可以是容器内的绝对路径，也可以是相对于工作目录的相对路径（工作目录可以用 `WORKDIR` 指令来指定）。目标路径不需要事先创建，如果目录不存在会在复制文件前先行创建缺失目录。
 
@@ -554,7 +581,7 @@ Docker 在 OverlayFS 上构建的容器也是利用了类似的原理。
 
 如果源路径为文件夹，复制的时候不是直接复制该文件夹，而是将文件夹中的内容复制到目标路径。
 
-### ADD 更高级的复制文件
+#### ADD 更高级的复制文件
 
 `ADD` 指令和 `COPY` 的格式和性质基本一致。但是在 `COPY` 基础上增加了一些功能。
 
@@ -570,7 +597,7 @@ Docker 在 OverlayFS 上构建的容器也是利用了类似的原理。
 
 因此在 `COPY` 和 `ADD` 指令中选择的时候，可以遵循这样的原则，所有的文件复制均使用 `COPY` 指令，仅在需要自动解压缩的场合使用 `ADD`。
 
-### CMD 容器启动命令
+#### CMD 容器启动命令
 
 `CMD` 指令的格式和 `RUN` 相似，也是两种格式：
 
@@ -598,7 +625,7 @@ CMD [ "sh", "-c", "echo $HOME" ]
 
 Docker 不是虚拟机，容器中的应用都应该以前台执行，而不是像虚拟机、物理机里面那样，用 `systemd` 去启动后台服务，容器内没有后台服务的概念。
 
-### ENTRYPOINT 入口点
+#### ENTRYPOINT 入口点
 
 `ENTRYPOINT` 的格式和 `RUN` 指令格式一样，分为 `exec` 格式和 `shell` 格式。
 
@@ -651,7 +678,7 @@ X-Request-Id: 1804f1f76ef953287fdc6b04406a2dbf
 
 这些准备工作是和容器 `CMD` 无关的，无论 `CMD` 为什么，都需要事先进行一个预处理的工作。这种情况下，可以写一个脚本，然后放入 `ENTRYPOINT` 中去执行，而这个脚本会将接到的参数（也就是 `<CMD>`）作为命令，在脚本最后执行。
 
-### ENV 设置环境变量
+#### ENV 设置环境变量
 
 格式有两种：
 
@@ -680,7 +707,7 @@ RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-
 
 可以从这个指令列表里感觉到，环境变量可以使用的地方很多，很强大。通过环境变量，我们可以让一份 `Dockerfile` 制作更多的镜像，只需使用不同的环境变量即可。
 
-### ARG 构建参数
+#### ARG 构建参数
 
 格式：`ARG <参数名>[=<默认值>]`
 
@@ -725,7 +752,7 @@ ARG DOCKER_USERNAME=library
 RUN set -x ; echo ${DOCKER_USERNAME}
 ```
 
-### VOLUME 定义匿名卷
+#### VOLUME 定义匿名卷
 
 格式为：
 
@@ -746,7 +773,7 @@ $ docker run -d -v mydata:/data xxxx
 
 在这行命令中，就使用了 `mydata` 这个命名卷挂载到了 `/data` 这个位置，替代了 `Dockerfile` 中定义的匿名卷的挂载配置。
 
-### EXPOSE 声明端口
+#### EXPOSE 声明端口
 
 格式为 `EXPOSE <端口1> [<端口2>...]`。
 
@@ -754,7 +781,7 @@ $ docker run -d -v mydata:/data xxxx
 
 要将 `EXPOSE` 和在运行时使用 `-p <宿主端口>:<容器端口>` 区分开来。`-p`，是映射宿主端口和容器端口，换句话说，就是将容器的对应端口服务公开给外界访问，而 `EXPOSE` 仅仅是声明容器打算使用什么端口而已，并不会自动在宿主进行端口映射。
 
-### WORKDIR 指定工作目录
+#### WORKDIR 指定工作目录
 
 格式为 `WORKDIR <工作目录路径>`。
 
@@ -770,7 +797,7 @@ RUN echo "hello" > world.txt
 
 如果你的 `WORKDIR` 指令使用的相对路径，那么所切换的路径与之前的 `WORKDIR` 有关。
 
-### USER 指定当前用户
+#### USER 指定当前用户
 
 格式：`USER <用户名>[:<用户组>]`
 
@@ -797,7 +824,7 @@ RUN wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/downloa
 CMD [ "exec", "gosu", "redis", "redis-server" ]
 ```
 
-### HEALTHCHECK 健康检查
+#### HEALTHCHECK 健康检查
 
 格式：
 
@@ -822,7 +849,7 @@ CMD [ "exec", "gosu", "redis", "redis-server" ]
 
 在 `HEALTHCHECK [选项] CMD` 后面的命令，格式和 `ENTRYPOINT` 一样，分为 `shell` 格式，和 `exec` 格式。命令的返回值决定了该次健康检查的成功与否：`0`：成功；`1`：失败；`2`：保留，不要使用这个值。
 
-### LABEL 指令
+#### LABEL 指令
 
 `LABEL` 指令用来给镜像以键值对的形式添加一些元数据（metadata）。
 
@@ -838,15 +865,15 @@ LABEL org.opencontainers.image.authors="yeasy"
 LABEL org.opencontainers.image.documentation="https://yeasy.gitbooks.io"
 ```
 
-具体可以参考 https://github.com/opencontainers/image-spec/blob/master/annotations.md
+具体可以参考 <https://github.com/opencontainers/image-spec/blob/master/annotations.md>
 
-### SHELL 指令
+#### SHELL 指令
 
 格式：`SHELL ["executable", "parameters"]`
 
 `SHELL` 指令可以指定 `RUN` `ENTRYPOINT` `CMD` 指令的 shell，Linux 中默认为 `["/bin/sh", "-c"]`
 
-### ONBUILD 为他人做嫁衣裳
+#### ONBUILD 为他人做嫁衣裳
 
 格式：`ONBUILD <其它指令>`。
 
@@ -854,7 +881,7 @@ LABEL org.opencontainers.image.documentation="https://yeasy.gitbooks.io"
 
 `Dockerfile` 中的其它指令都是为了定制当前镜像而准备的，唯有 `ONBUILD` 是为了帮助别人定制自己而准备的。
 
-### 多阶段构建
+### Dockerfile 多阶段构建
 
 #### 之前的做法
 
@@ -897,7 +924,29 @@ $ docker build --target builder -t username/imagename:tag .
 $ COPY --from=nginx:latest /etc/nginx/nginx.conf /nginx.conf
 ```
 
-## 第五章 操作 Docker 容器
+### 其它制作镜像的方式
+
+#### 从 rootfs 压缩包导入
+
+格式：`docker import [选项] <文件>|<URL>|- [<仓库名>[:<标签>]]`
+
+压缩包可以是本地文件、远程 Web 文件，甚至是从标准输入中得到。压缩包将会在镜像 `/` 目录展开，并直接作为镜像第一层提交。
+
+#### Docker 镜像的导入和导出 docker save 和 docker load
+
+Docker 还提供了 `docker save` 和 `docker load` 命令，用以将镜像保存为一个文件，然后传输到另一个位置上，再加载进来。这是在没有 Docker Registry 时的做法，现在已经不推荐，镜像迁移应该直接使用 Docker Registry，无论是直接使用 Docker Hub 还是使用内网私有 Registry 都可以。
+
+### 实现原理
+
+Docker 镜像是怎么实现增量的修改和维护的？
+
+每个镜像都由很多层次构成，Docker 使用 [Union FS](https://en.wikipedia.org/wiki/UnionFS) 将这些不同的层结合到一个镜像中去。
+
+通常 Union FS 有两个用途, 一方面可以实现不借助 LVM、RAID 将多个 disk 挂到同一个目录下,另一个更常用的就是将一个只读的分支和一个可写的分支联合在一起，Live CD 正是基于此方法可以允许在镜像不变的基础上允许用户在其上进行一些写操作。
+
+Docker 在 OverlayFS 上构建的容器也是利用了类似的原理。
+
+## 第五章 操作容器
 
 容器是独立运行的一个或一组应用，以及它们的运行态环境。对应的，虚拟机可以理解为模拟运行的一整套操作系统（提供了运行态环境和其他系统环境）和跑在上面的应用。
 
@@ -1078,9 +1127,7 @@ $ docker import http://example.com/exampleimage.tgz example/imagerepo
 $ docker container prune
 ```
 
-## 第六章 Docker 仓库
-
-### 访问仓库
+## 第六章 访问仓库
 
 仓库（`Repository`）是集中存放镜像的地方。
 
