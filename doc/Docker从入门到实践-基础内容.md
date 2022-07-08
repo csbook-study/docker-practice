@@ -176,6 +176,16 @@ $ docker run --rm hello-world
 
 国内从 Docker Hub 拉取镜像有时会遇到困难，此时可以配置镜像加速器。国内很多云服务商都提供了国内加速器服务。
 
+### 开启实验特性
+
+编辑 `/etc/docker/daemon.json`，新增如下条目：
+
+```json
+{
+  "experimental": true
+}
+```
+
 ## 第四章 使用镜像
 
 Docker 运行容器前需要本地存在对应的镜像，如果本地不存在该镜像，Docker 会从镜像仓库下载该镜像。
@@ -459,7 +469,7 @@ Dockerfile 是一个文本文件，其内包含了一条条的 **指令(Instruct
 
 定制 `nginx` 镜像为例，使用 Dockerfile 来定制。
 
-```docker
+```dockerfile
 FROM nginx
 RUN echo '<h1>Hello, Docker!</h1>' > /usr/share/nginx/html/index.html
 ```
@@ -470,7 +480,7 @@ RUN echo '<h1>Hello, Docker!</h1>' > /usr/share/nginx/html/index.html
 
 除了选择现有镜像为基础镜像外，Docker 还存在一个特殊的镜像，名为 `scratch`。这个镜像是虚拟的概念，并不实际存在，它表示一个空白的镜像。
 
-```docker
+```dockerfile
 FROM scratch
 ...
 ```
@@ -485,7 +495,7 @@ FROM scratch
 
 - *shell* 格式：`RUN <命令>`，就像直接在命令行中输入的命令一样。刚才写的 Dockerfile 中的 `RUN` 指令就是这种格式。
 
-```docker
+```dockerfile
 RUN echo '<h1>Hello, Docker!</h1>' > /usr/share/nginx/html/index.html
 ```
 
@@ -495,7 +505,7 @@ Dockerfile 中每一个指令都会建立一层，`RUN` 也不例外。每一个
 
 *Union FS 是有最大层数限制的，比如 AUFS，曾经是最大不得超过 42 层，现在是不得超过 127 层。*
 
-```docker
+```dockerfile
 FROM debian:stretch
 RUN set -x; buildDeps='gcc libc6-dev make wget' \
     && apt-get update \
@@ -613,13 +623,13 @@ Docker 不是虚拟机，容器就是进程。既然是进程，那么在启动�
 
 如果使用 `shell` 格式的话，实际的命令会被包装为 `sh -c` 的参数的形式进行执行。比如：
 
-```docker
+```dockerfile
 CMD echo $HOME
 ```
 
 在实际执行中，会将其变更为：
 
-```docker
+```dockerfile
 CMD [ "sh", "-c", "echo $HOME" ]
 ```
 
@@ -639,7 +649,7 @@ Docker 不是虚拟机，容器中的应用都应该以前台执行，而不是�
 
 场景一：让镜像变成像命令一样使用
 
-```docker
+```dockerfile
 FROM ubuntu:18.04
 RUN apt-get update \
     && apt-get install -y curl \
@@ -689,7 +699,7 @@ X-Request-Id: 1804f1f76ef953287fdc6b04406a2dbf
 
 定义了环境变量，那么在后续的指令中，就可以使用这个环境变量。比如在官方 `node` 镜像 `Dockerfile` 中，就有类似这样的代码：
 
-```docker
+```dockerfile
 ENV NODE_VERSION 7.2.0
 
 RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
@@ -719,7 +729,7 @@ RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-
 
 ARG 指令有生效范围，如果在 `FROM` 指令之前指定，那么只能用于 `FROM` 指令中：
 
-```docker
+```dockerfile
 # 这个变量在每个 FROM 中都生效
 ARG DOCKER_USERNAME=library
 
@@ -734,7 +744,7 @@ RUN set -x ; echo 2
 
 要想正常输出，你必须在 `FROM` 之后再次指定 `ARG`：
 
-```docker
+```dockerfile
 ARG DOCKER_USERNAME=library
 
 FROM ${DOCKER_USERNAME}/alpine
@@ -761,7 +771,7 @@ RUN set -x ; echo ${DOCKER_USERNAME}
 
 为了防止运行时用户忘记将动态文件所保存目录挂载为卷，在 `Dockerfile` 中，我们可以事先指定某些目录挂载为匿名卷，这样在运行时如果用户不指定挂载，其应用也可以正常运行，不会向容器存储层写入大量数据。
 
-```docker
+```dockerfile
 VOLUME /data
 ```
 
@@ -789,7 +799,7 @@ $ docker run -d -v mydata:/data xxxx
 
 如果需要改变以后各层的工作目录的位置，那么应该使用 `WORKDIR` 指令。
 
-```docker
+```dockerfile
 WORKDIR /app
 
 RUN echo "hello" > world.txt
@@ -805,7 +815,7 @@ RUN echo "hello" > world.txt
 
 注意，`USER` 只是帮助你切换到指定用户而已，这个用户必须是事先建立好的，否则无法切换。
 
-```docker
+```dockerfile
 RUN groupadd -r redis && useradd -r -g redis redis
 USER redis
 RUN [ "redis-server" ]
@@ -813,7 +823,7 @@ RUN [ "redis-server" ]
 
 如果以 `root` 执行的脚本，在执行期间希望改变身份，比如希望以某个已经建立好的用户来运行某个服务进程，不要使用 `su` 或者 `sudo`，这些都需要比较麻烦的配置，而且在 TTY 缺失的环境下经常出错。建议使用 [`gosu`](https://github.com/tianon/gosu)。
 
-```docker
+```dockerfile
 # 建立 redis 用户，并使用 gosu 换另一个用户执行命令
 RUN groupadd -r redis && useradd -r -g redis redis
 # 下载 gosu
@@ -853,13 +863,13 @@ CMD [ "exec", "gosu", "redis", "redis-server" ]
 
 `LABEL` 指令用来给镜像以键值对的形式添加一些元数据（metadata）。
 
-```docker
+```dockerfile
 LABEL <key>=<value> <key>=<value> <key>=<value> ...
 ```
 
 还可以用一些标签来申明镜像的作者、文档地址等：
 
-```docker
+```dockerfile
 LABEL org.opencontainers.image.authors="yeasy"
 
 LABEL org.opencontainers.image.documentation="https://yeasy.gitbooks.io"
@@ -906,7 +916,7 @@ LABEL org.opencontainers.image.documentation="https://yeasy.gitbooks.io"
 
 我们可以使用 `as` 来为某一阶段命名，例如：
 
-```docker
+```dockerfile
 FROM golang:alpine as builder
 ```
 
@@ -920,7 +930,7 @@ $ docker build --target builder -t username/imagename:tag .
 
 上面例子中我们使用 `COPY --from=0 /go/src/github.com/go/helloworld/app .` 从上一阶段的镜像中复制文件，我们也可以复制任意镜像中的文件。
 
-```docker
+```dockerfile
 $ COPY --from=nginx:latest /etc/nginx/nginx.conf /nginx.conf
 ```
 
