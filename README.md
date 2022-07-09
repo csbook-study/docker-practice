@@ -13,3 +13,5 @@ Docker 从入门到实践 docker practice book code exercise and study
 第四部分：安全和实现技术：[Docker从入门到实践-安全和实现技术](doc/Docker从入门到实践-安全和实现技术.md)
 
 第五部分：开源项目：[Docker从入门到实践-开源项目](doc/Docker从入门到实践-开源项目.md)
+
+第六部分：附录：[Docker从入门到实践-附录](doc/Docker从入门到实践-附录.md)
